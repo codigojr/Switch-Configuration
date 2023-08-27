@@ -72,27 +72,28 @@ class SwitchConfigApp(tk.Tk):
     def setup_mail_tab(self):
         # Título
         title_label = ttk.Label(self.mail_frame, text="Registrar correo electrónico", font=("Arial", 16, "bold"))
-        title_label.grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
+        title_label.grid(row=0, column=0, columnspan=2, pady=5, sticky=tk.W)
 
-        
         # Asunto del correo
         subject_label = ttk.Label(self.mail_frame, text="Asunto:", font=("Arial", 12))
-        subject_label.grid(row=2, column=0, padx=20, pady=10, sticky=tk.W)
+        subject_label.grid(row=1, column=0, padx=20, pady=5, sticky=tk.W)
         self.subject_entry = ttk.Entry(self.mail_frame)
-        self.subject_entry.grid(row=2, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+        self.subject_entry.grid(row=1, column=1, padx=20, pady=5, sticky=tk.W+tk.E)
 
         # Botones para las Respuestas de Email
         self.start_response_button = ttk.Button(self.mail_frame, text="Generar Respuesta de Inicio", command=self.generate_start_response)
-        self.start_response_button.grid(row=3, column=0, pady=10)
+        self.start_response_button.grid(row=2, column=0, padx=20, pady=5)
 
         self.end_response_button = ttk.Button(self.mail_frame, text="Generar Respuesta de Finalización", command=self.generate_end_response)
-        self.end_response_button.grid(row=3, column=1, pady=10)
+        self.end_response_button.grid(row=2, column=1, padx=20, pady=5)
 
         # Cuerpo del mensaje
         message_label = ttk.Label(self.mail_frame, text="Mensaje:", font=("Arial", 12))
-        message_label.grid(row=4, column=0, padx=20, pady=10, sticky=tk.W)
+        message_label.grid(row=3, column=0, padx=20, pady=5, sticky=tk.W)
+        
         self.message_text = scrolledtext.ScrolledText(self.mail_frame, wrap=tk.WORD, width=50, height=10)
-        self.message_text.grid(row=4, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+        self.message_text.grid(row=3, column=1, padx=20, pady=5, sticky=tk.W+tk.E)
+
        
     def generate_start_response(self):
         response = """
@@ -244,37 +245,37 @@ Saludos"""
         messagebox.showinfo("Resumen del Puerto", summary)
 
     def setup_port_security_frame(self):
-       # Variables
+        # Variables
         self.port_security_var = tk.BooleanVar()
 
         # Create and place the widgets inside the port-security frame
-        ttk.Label(self.port_security_frame, text="Port Security Configuration", font=("Arial", 16)).grid(row=0, column=0, columnspan=5, pady=(10, 20))
+        ttk.Label(self.port_security_frame, text="Port Security Configuration", font=("Arial", 16)).grid(row=0, column=0, columnspan=2, pady=(5, 15))
 
+        # Enable Port Security CheckButton
         self.port_security_check = ttk.Checkbutton(self.port_security_frame, text="Enable Port Security", variable=self.port_security_var)
-        self.port_security_check.grid(row=1, column=0, padx=20, pady=10, sticky=tk.W)
-        
-        self.port_security_max_label = ttk.Label(self.port_security_frame, text="Max MAC Addresses:")
-        self.port_security_max_label.grid(row=2, column=0, padx=20, pady=10, sticky=tk.W)
+        self.port_security_check.grid(row=1, column=0, padx=20, pady=5, sticky=tk.W)
 
+        # Max MAC Addresses Label and Spinbox
+        ttk.Label(self.port_security_frame, text="Max MAC Addresses:").grid(row=2, column=0, padx=20, pady=5, sticky=tk.W)
         self.port_security_max_spinbox = ttk.Spinbox(self.port_security_frame, from_=1, to=10, width=5)
-        self.port_security_max_spinbox.grid(row=2, column=1, padx=20, pady=10, sticky=tk.W)
+        self.port_security_max_spinbox.grid(row=2, column=1, padx=20, pady=5, sticky=tk.W)
         self.port_security_max_spinbox.set(1)
 
-        self.port_number_label = ttk.Label(self.port_security_frame, text="Port Number (e.g. Fa0/1):")
-        self.port_number_label.grid(row=3, column=0, padx=20, pady=10, sticky=tk.W)
-
+        # Port Number Label and Entry
+        ttk.Label(self.port_security_frame, text="Port Number (e.g. Fa0/1):").grid(row=3, column=0, padx=20, pady=5, sticky=tk.W)
         self.port_number_entry = ttk.Entry(self.port_security_frame)
-        self.port_number_entry.grid(row=3, column=1, padx=20, pady=10, sticky=tk.W)
+        self.port_number_entry.grid(row=3, column=1, padx=20, pady=5, sticky=tk.W)
 
-        self.generate_port_security_activation_button = ttk.Button(self.port_security_frame, text="Activate Port-Security", command=self.generate_port_security_activation_config)  # Added command
-        self.generate_port_security_activation_button.grid(row=4, column=0, columnspan=2, padx=20, pady=10)
+        # Activation and Deactivation Buttons
+        self.generate_port_security_activation_button = ttk.Button(self.port_security_frame, text="Activate Port-Security", command=self.generate_port_security_activation_config)
+        self.generate_port_security_activation_button.grid(row=4, column=0, columnspan=2, padx=20, pady=5)
 
-        self.generate_port_security_deactivation_button = ttk.Button(self.port_security_frame, text="Deactivate Port-Security", command=self.generate_port_security_deactivation_config)  # Added command
-        self.generate_port_security_deactivation_button.grid(row=5, column=0, columnspan=2, padx=20, pady=10)
+        self.generate_port_security_deactivation_button = ttk.Button(self.port_security_frame, text="Deactivate Port-Security", command=self.generate_port_security_deactivation_config)
+        self.generate_port_security_deactivation_button.grid(row=5, column=0, columnspan=2, padx=20, pady=5)
 
-        # Text widget to display the generated config
-        self.config_text = scrolledtext.ScrolledText(self.port_security_frame, wrap=tk.WORD, width=70, height=15)
-        self.config_text.grid(row=6, column=0, columnspan=5, padx=20, pady=20)
+        # Text widget to display the generated config on the right side
+        self.config_text = scrolledtext.ScrolledText(self.port_security_frame, wrap=tk.WORD, width=70, height=25)
+        self.config_text.grid(row=0, column=2, rowspan=7, padx=20, pady=10, sticky=tk.N)
 
     def generate_port_security_activation_config(self):
         """Generate the port security activation config based on user input."""
@@ -397,7 +398,6 @@ Saludos"""
             self.connection_status.configure(text="Status: Not connected")
             messagebox.showerror("Not Connected", "Please connect to a switch first!")
 
-
     def enter_config_mode(self):
             """
             Handles the switch configuration mode.
@@ -443,20 +443,25 @@ Saludos"""
         self.switch_combobox.grid(row=1, column=1, padx=20, pady=10, sticky=tk.W)
         self.switch_combobox.bind("<<ComboboxSelected>>", self.load_switch_data_from_db)
         self.switch_combobox.bind('<KeyRelease>', self.update_combobox_from_db)
-
+      
     # Mantenemos la versión que usa SQLite y renombramos la función
     def load_switch_data_from_db(self, event):
         conn = sqlite3.connect('switch_data.db')
         cursor = conn.cursor()
         ip_selected = self.switch_combobox.get()
-        cursor.execute("SELECT username, password FROM switch_data WHERE ip=?", (ip_selected,))
+        cursor.execute("SELECT username, password, nemonic FROM switch_data WHERE ip=?", (ip_selected,))
         data = cursor.fetchone()
         if data:
-            username, password = data
+            username, password, nemonic = data
             self.username_entry.delete(0, tk.END)
             self.username_entry.insert(0, username)
             self.password_entry.delete(0, tk.END)
             self.password_entry.insert(0, password)
+            self.ip_entry.delete(0, tk.END)  # Agregar esto
+            self.ip_entry.insert(0, ip_selected)  # Y esto
+            if nemonic:
+                self.nemonico_entry.delete(0, tk.END)
+                self.nemonico_entry.insert(0, nemonic)
         conn.close()
 
     # Mantenemos la versión que usa SQLite y renombramos la función
@@ -498,7 +503,6 @@ Saludos"""
         else:
             messagebox.showerror("Not Connected", "¡Por favor, conéctate a un switch primero!")
     
-
     def setup_output_text(self, frame):
         
         self.command_text = tk.Text(frame, height=5, width=70, padx=10, pady=10)
@@ -591,7 +595,6 @@ Saludos"""
             self.connection = None
             messagebox.showerror("Error", str(e))
             self.connection_status.configure(text="Status: Not connected")
-
    
     def init_db(self):
         conn = sqlite3.connect('switch_data.db')
@@ -663,29 +666,18 @@ Saludos"""
         title_label = ttk.Label(frame, text="Configuración Voz y Datos", font=("Arial", 16, "bold"))
         title_label.grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
 
-        # Puerto
-        port_label = ttk.Label(frame, text="Número de Puerto (Ej: Gi1/0/39):", font=("Arial", 12))
-        port_label.grid(row=1, column=0, padx=20, pady=10, sticky=tk.W)
-        self.port_entry = ttk.Entry(frame)
-        self.port_entry.grid(row=1, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+        # Diccionario para facilitar la creación de Labels y Entries
+        fields = [
+            ("Número de Puerto (Ej: Gi1/0/39):", "port_entry"),
+            ("Descripción:", "desc_entry"),
+            ("Número de VLAN:", "vlan_entry"),
+            ("Valor IP Device Tracking:", "ip_device_entry")
+        ]
 
-        # Descripción
-        desc_label = ttk.Label(frame, text="Descripción:", font=("Arial", 12))
-        desc_label.grid(row=2, column=0, padx=20, pady=10, sticky=tk.W)
-        self.desc_entry = ttk.Entry(frame)
-        self.desc_entry.grid(row=2, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
-
-        # VLAN
-        vlan_label = ttk.Label(frame, text="Número de VLAN:", font=("Arial", 12))
-        vlan_label.grid(row=3, column=0, padx=20, pady=10, sticky=tk.W)
-        self.vlan_entry = ttk.Entry(frame)
-        self.vlan_entry.grid(row=3, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
-
-        # IP Device Tracking
-        ip_device_label = ttk.Label(frame, text="Valor IP Device Tracking:", font=("Arial", 12))
-        ip_device_label.grid(row=4, column=0, padx=20, pady=10, sticky=tk.W)
-        self.ip_device_entry = ttk.Entry(frame)
-        self.ip_device_entry.grid(row=4, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+        for idx, (label_text, entry_attr) in enumerate(fields):
+            ttk.Label(frame, text=label_text, font=("Arial", 12)).grid(row=idx+1, column=0, padx=20, pady=10, sticky=tk.W)
+            setattr(self, entry_attr, ttk.Entry(frame))
+            getattr(self, entry_attr).grid(row=idx+1, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
 
         # Botón para Generar
         generate_button = ttk.Button(frame, text="Generar Código", command=self.generate_voice_data_config)
@@ -693,7 +685,7 @@ Saludos"""
 
         # Cuadro de Texto para el Código
         self.code_output = tk.Text(frame, height=20, width=80)
-        self.code_output.grid(row=6, column=0, columnspan=2, padx=20, pady=10)
+        self.code_output.grid(row=0, column=2, rowspan=7, padx=20, pady=10, sticky=tk.N)
     
     def generate_voice_data_config(self):
         port = self.port_entry.get().strip()
