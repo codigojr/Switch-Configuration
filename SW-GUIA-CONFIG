@@ -7,8 +7,11 @@ import os
 import requests
 
 class SwitchConfigApp(tk.Tk):
-    def __init__(self):
+    def __init__(self):            
         super().__init__()
+
+        # Estilo
+        self.setup_style()
 
         # Initialize the database
         self.init_db()
@@ -16,30 +19,59 @@ class SwitchConfigApp(tk.Tk):
         # Load switches from database
         self.switches = self.get_all_switches()
 
-        self.title("Switch Configuration GUI Enhanced")
-        self.geometry("1300x950")
+        # Set window properties
+        self.title("Switch Configuration GUI Enhanced by Jose Roberto Medina")
+        self.geometry("1495x651")
 
-         # Create a notebook (tabs)
+        # Create a notebook (tabs)
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(expand=True, fill="both", padx=10, pady=10)
+        self.notebook.grid(row=0, column=0, sticky=tk.N+tk.E+tk.S+tk.W, padx=10, pady=10)
+
+
+        # Asegúrate de que la ventana principal se expanda para acomodar el notebook
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
         
+
+
+
         # Create frames for each tab
         self.general_frame = ttk.Frame(self.notebook)
         self.port_security_frame = ttk.Frame(self.notebook)
-        self.voice_data_frame = ttk.Frame(self.notebook)  
-        self.mail_frame = ttk.Frame(self.notebook)  
+        self.voice_data_frame = ttk.Frame(self.notebook)
+        self.mail_frame = ttk.Frame(self.notebook)
 
         # Add frames to the notebook
         self.notebook.add(self.general_frame, text="General")
         self.notebook.add(self.port_security_frame, text="Port Security")
-        self.notebook.add(self.voice_data_frame, text="Voz y Datos")  
-        self.notebook.add(self.mail_frame, text="Mail")  
+        self.notebook.add(self.voice_data_frame, text="Voz y Datos")
+        self.notebook.add(self.mail_frame, text="Mail")
 
         # Initialize frames
         self.setup_general_frame()
         self.setup_port_security_frame()
-        self.setup_voice_data_tab(self.voice_data_frame)  
+        self.setup_voice_data_tab(self.voice_data_frame)
         self.setup_mail_tab()
+
+    def setup_style(self):
+            BACKGROUND_COLOR = "#f5f5f5"  # Un color de fondo más suave
+            ACCENT_COLOR = "#4CAF50"  # Un color acentuado para botones u otros elementos interactivos
+            TEXT_COLOR = "#333333"  # Un color oscuro para el texto, para mejorar la legibilidad
+            BUTTON_TEXT_COLOR = "#000000"  # Color de texto para los botones
+
+            self.configure(bg=BACKGROUND_COLOR)  # Color de fondo
+            self.style = ttk.Style(self)
+            
+            # Configuraciones generales de estilo
+            self.style.configure("TLabel", font=("Segoe UI", 12), background=BACKGROUND_COLOR, foreground=TEXT_COLOR)
+            self.style.configure("TLabelFrame", font=("Segoe UI", 12, "bold"), background=BACKGROUND_COLOR, foreground=TEXT_COLOR)
+            self.style.configure("TCheckbutton", font=("Segoe UI", 12), background=BACKGROUND_COLOR, foreground=TEXT_COLOR)
+            self.style.configure("TButton", font=("Segoe UI", 12), background=ACCENT_COLOR, foreground=BUTTON_TEXT_COLOR, padding=(10, 5), relief="raised", borderwidth=2)
+
+            # Espaciado y padding para los elementos
+            self.style.configure("TFrame", padding=20, relief="flat", background=BACKGROUND_COLOR)
+            self.style.configure("TNotebook.Tab", padding=[12, 5], background=BACKGROUND_COLOR, foreground=TEXT_COLOR)
+            self.style.configure("TNotebook", background=BACKGROUND_COLOR, tabmargins=[2, 5, 2, 0])
         
     def setup_mail_tab(self):
         # Título
@@ -105,19 +137,21 @@ Saludos"""
         self.emails_listbox.insert(tk.END, formatted_email)
      
     def setup_general_frame(self):
-        # Create frames inside the General Frame
+         # Create frames inside the General Frame
+        self.mac_frame = ttk.LabelFrame(self.general_frame, text="MAC Lookup", padding=(20, 15))
         self.input_frame = ttk.LabelFrame(self.general_frame, text="Switch Details", padding=(20, 15))
         self.command_frame = ttk.LabelFrame(self.general_frame, text="Command Input", padding=(20, 15))
-        
-        self.input_frame.grid(row=0, column=0, padx=20, pady=10, sticky=tk.W+tk.E)
-        self.command_frame.grid(row=1, column=0, padx=20, pady=10, sticky=tk.W+tk.E)
-        self.setup_mac_lookup(self.general_frame)  # Using the general frame
+
+        self.mac_frame.grid(row=0, column=0, padx=20, pady=10, sticky=tk.W+tk.E)
+        self.input_frame.grid(row=1, column=0, padx=20, pady=10, sticky=tk.W+tk.E)
+        self.command_frame.grid(row=0, column=1, padx=20, pady=10, rowspan=2, sticky=tk.N+tk.W+tk.E+tk.S) # Moved to the right of input_frame
 
         # Setup widgets inside the frames
+        self.setup_mac_lookup(self.mac_frame)
         self.setup_labels(self.input_frame)
         self.setup_entries(self.input_frame)
         self.setup_combobox(self.input_frame)
-        self.setup_buttons(self.input_frame)  # Move to input_frame
+        self.setup_buttons(self.input_frame)
         self.setup_output_text(self.command_frame)
  
     def setup_check_button(self, frame):
@@ -400,15 +434,14 @@ Saludos"""
 
     def setup_buttons(self, frame):
         
-        self.connect_button = ttk.Button(frame, text="Connect", command=self.connect_to_switch)  # Added command
-        self.send_command_button = ttk.Button(frame, text="Send Command", command=self.send_command)  # Added command
-        self.backup_button = ttk.Button(frame, text="Backup", command=self.backup_config)  # Added command
-        self.check_port_security_button = ttk.Button(frame, text="Check Port-Security", command=self.check_port_security)  # Added command
+        self.connect_button = ttk.Button(frame, text="Connect", command=self.connect_to_switch)
+        self.backup_button = ttk.Button(frame, text="Backup", command=self.backup_config)
+        self.check_port_security_button = ttk.Button(frame, text="Check Port-Security", command=self.check_port_security)
 
         self.connect_button.grid(row=7, column=0, pady=10, sticky=tk.W)
-        self.send_command_button.grid(row=7, column=1, pady=10, sticky=tk.W)
         self.backup_button.grid(row=7, column=2, pady=10, sticky=tk.E)
         self.check_port_security_button.grid(row=8, column=0, columnspan=3, pady=10, sticky=tk.W+tk.E)
+
        
     def backup_config(self):
             self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
@@ -427,7 +460,11 @@ Saludos"""
 
     def setup_output_text(self, frame):
         self.command_text = tk.Text(frame, height=5, width=70)
-        self.command_text.grid(row=0, column=0, columnspan=3, padx=20, pady=10, sticky=tk.W+tk.E)
+        self.command_text.grid(row=0, column=0, padx=20, pady=10, sticky=tk.W)
+        
+        self.send_command_button = ttk.Button(frame, text="Send Command", command=self.send_command)
+        self.send_command_button.grid(row=0, column=1, padx=20, pady=10, sticky=tk.W)  # Moved to command_frame next to command_text
+
         self.output_text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=70, height=20)
         self.output_text.grid(row=2, column=0, columnspan=3, padx=20, pady=10, sticky=tk.W+tk.E)
     
@@ -540,10 +577,13 @@ Saludos"""
             messagebox.showerror("MAC Lookup", "Error al buscar el fabricante. Verifique su conexión a internet y vuelva a intentarlo.")
 
     def setup_mac_lookup(self, frame):
-        self.mac_frame = ttk.LabelFrame(frame, text="MAC Lookup", padding=(20, 15))  # Define mac_frame here
-        self.mac_frame.grid(row=0, column=1, padx=20, pady=10, sticky=tk.W+tk.E)  # Move to the right
-        
-        self.mac_label = ttk.Label(self.mac_frame, text="MAC Address Lookup:", font=("Arial", 12))
+        self.mac_label = ttk.Label(frame, text="MAC Address Lookup:", font=("Arial", 12))
+        self.mac_entry = ttk.Entry(frame)
+        self.mac_button = ttk.Button(frame, text="Lookup MAC", command=self.lookup_mac)
+
+        self.mac_label.grid(row=0, column=0, padx=20, pady=10, sticky=tk.W)
+        self.mac_entry.grid(row=0, column=1, padx=20, pady=10, sticky=tk.W+tk.E)  # Allow expansion horizontally
+        self.mac_button.grid(row=0, column=2, padx=20, pady=10)
         self.mac_entry = ttk.Entry(self.mac_frame)
         self.mac_button = ttk.Button(self.mac_frame, text="Lookup MAC", command=self.lookup_mac)
 
