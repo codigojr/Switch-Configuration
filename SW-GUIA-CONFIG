@@ -93,7 +93,6 @@ class SwitchConfigApp(tk.Tk):
         
         self.message_text = scrolledtext.ScrolledText(self.mail_frame, wrap=tk.WORD, width=50, height=10)
         self.message_text.grid(row=3, column=1, padx=20, pady=5, sticky=tk.W+tk.E)
-
        
     def generate_start_response(self):
         response = """
@@ -157,9 +156,52 @@ Saludos"""
         self.check_port_security_button.grid(row=7, column=1, pady=10)
 
     def show_ip_device_tracking(self):
-        messagebox.showinfo("Información", "Pronto estará disponible!")
+        if not self.is_connected():
+            messagebox.showerror("Error", "Necesitas conectarte a un switch primero.")
+            return
+        """
+        Función para mostrar la información del dispositivo rastreado en una interfaz específica.
+        """
+
+        # Obtener la interfaz introducida por el usuario
+        interface = self.port_number_entry.get().strip()
+
+        # Verificar si el usuario ha introducido la interfaz
+        if not interface:
+            messagebox.showerror("Error", "Por favor introduce el número de puerto (ej. Gi1/0/39) antes de verificar.")
+            return
+        
+        # Verificar si la aplicación está conectada al switch
+        if self.is_connected():
+            try:
+                # Enviar el comando específico de la interfaz
+                output_interface = self.connection.send_command(f"show ip device tracking interface {interface}")
+                
+                # Si no hay detalles en la salida específica de la interfaz, informar al usuario
+                if not output_interface.strip():
+                    messagebox.showinfo("IP Device Tracking", f"No se encontraron dispositivos rastreados en la interfaz {interface}.")
+                    return
+                else:
+                    # Aquí puedes mejorar el análisis para extraer información más específica de la salida
+                    # Por simplicidad, vamos a mostrar toda la salida en un messagebox
+                    # Pero lo ideal sería analizar la salida y mostrar solo la información relevante
+                    details = output_interface.splitlines()[3:]  # Aquí asumo que las primeras 3 líneas son de encabezado, modifica según tu output.
+                    device_info = "\n".join(details)
+                    messagebox.showinfo("IP Device Tracking", f"Dispositivo detectado en la interfaz {interface}:\n\n{device_info}")
+                    
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al obtener el tracking: {str(e)}")
+        else:
+            messagebox.showerror("Error", "Primero debes conectarte al switch.")
+
+
+
+
     
     def check_port_security(self):
+        if not self.is_connected():
+            messagebox.showerror("Error", "Necesitas conectarte a un switch primero.")
+            return
         self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
         port_number = self.port_number_entry.get().strip()
         if not port_number:
@@ -359,13 +401,14 @@ Saludos"""
 
     def is_connected(self):
         """Checks if still connected to the switch."""
-        if not self.connection:
+        if not hasattr(self, 'connection') or self.connection is None:
             return False
         try:
             self.connection.find_prompt()
             return True
         except:
             return False
+
 
     def send_command(self):
         self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
