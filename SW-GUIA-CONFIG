@@ -1,0 +1,624 @@
+import tkinter as tk
+from tkinter import ttk, scrolledtext, messagebox
+from netmiko import ConnectHandler
+from netmiko import NetMikoTimeoutException, NetMikoAuthenticationException
+import sqlite3
+import os
+import requests
+
+class SwitchConfigApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+
+        # Initialize the database
+        self.init_db()
+
+        # Load switches from database
+        self.switches = self.get_all_switches()
+
+        self.title("Switch Configuration GUI Enhanced")
+        self.geometry("1300x950")
+
+         # Create a notebook (tabs)
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(expand=True, fill="both", padx=10, pady=10)
+        
+        # Create frames for each tab
+        self.general_frame = ttk.Frame(self.notebook)
+        self.port_security_frame = ttk.Frame(self.notebook)
+        self.voice_data_frame = ttk.Frame(self.notebook)  
+        self.mail_frame = ttk.Frame(self.notebook)  
+
+        # Add frames to the notebook
+        self.notebook.add(self.general_frame, text="General")
+        self.notebook.add(self.port_security_frame, text="Port Security")
+        self.notebook.add(self.voice_data_frame, text="Voz y Datos")  
+        self.notebook.add(self.mail_frame, text="Mail")  
+
+        # Initialize frames
+        self.setup_general_frame()
+        self.setup_port_security_frame()
+        self.setup_voice_data_tab(self.voice_data_frame)  
+        self.setup_mail_tab()
+        
+    def setup_mail_tab(self):
+        # Título
+        title_label = ttk.Label(self.mail_frame, text="Registrar correo electrónico", font=("Arial", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
+
+        
+        # Asunto del correo
+        subject_label = ttk.Label(self.mail_frame, text="Asunto:", font=("Arial", 12))
+        subject_label.grid(row=2, column=0, padx=20, pady=10, sticky=tk.W)
+        self.subject_entry = ttk.Entry(self.mail_frame)
+        self.subject_entry.grid(row=2, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+
+        # Botones para las Respuestas de Email
+        self.start_response_button = ttk.Button(self.mail_frame, text="Generar Respuesta de Inicio", command=self.generate_start_response)
+        self.start_response_button.grid(row=3, column=0, pady=10)
+
+        self.end_response_button = ttk.Button(self.mail_frame, text="Generar Respuesta de Finalización", command=self.generate_end_response)
+        self.end_response_button.grid(row=3, column=1, pady=10)
+
+        # Cuerpo del mensaje
+        message_label = ttk.Label(self.mail_frame, text="Mensaje:", font=("Arial", 12))
+        message_label.grid(row=4, column=0, padx=20, pady=10, sticky=tk.W)
+        self.message_text = scrolledtext.ScrolledText(self.mail_frame, wrap=tk.WORD, width=50, height=10)
+        self.message_text.grid(row=4, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+       
+    def generate_start_response(self):
+        response = """
+¡Hola!,
+
+Hemos comenzado el proceso de actualización de las configuraciones del puerto según su solicitud. 
+Le notificaremos una vez que los cambios hayan sido implementados.
+
+Saludos"""
+        self.message_text.delete(1.0, tk.END)
+        self.message_text.insert(tk.END, response)
+        self.subject_entry.delete(0, tk.END)
+        self.subject_entry.insert(0, "Actualización de configuración iniciada")
+
+    def generate_end_response(self):
+        response = """
+¡Hola!,
+
+Hemos completado con éxito las configuraciones del puerto según su solicitud. 
+Por favor, avísenos si hay algún problema o si se necesita algún ajuste adicional.
+
+Saludos"""
+        self.message_text.delete(1.0, tk.END)
+        self.message_text.insert(tk.END, response)
+        self.subject_entry.delete(0, tk.END)
+        self.subject_entry.insert(0, "Actualización de configuración completada")
+
+    def add_to_listbox(self):
+        email = self.email_entry.get().strip()
+        subject = self.subject_entry.get().strip()
+        message = self.message_text.get(1.0, tk.END).strip()
+
+        if not all([email, subject, message]):
+            messagebox.showerror("Error", "Por favor, rellena todos los campos antes de agregar.")
+            return
+
+        formatted_email = f"Para: {email}\nAsunto: {subject}\nMensaje:\n{message}\n{'-'*40}"
+        self.emails_listbox.insert(tk.END, formatted_email)
+     
+    def setup_general_frame(self):
+        # Create frames inside the General Frame
+        self.input_frame = ttk.LabelFrame(self.general_frame, text="Switch Details", padding=(20, 15))
+        self.command_frame = ttk.LabelFrame(self.general_frame, text="Command Input", padding=(20, 15))
+        
+        self.input_frame.grid(row=0, column=0, padx=20, pady=10, sticky=tk.W+tk.E)
+        self.command_frame.grid(row=1, column=0, padx=20, pady=10, sticky=tk.W+tk.E)
+        self.setup_mac_lookup(self.general_frame)  # Using the general frame
+
+        # Setup widgets inside the frames
+        self.setup_labels(self.input_frame)
+        self.setup_entries(self.input_frame)
+        self.setup_combobox(self.input_frame)
+        self.setup_buttons(self.input_frame)  # Move to input_frame
+        self.setup_output_text(self.command_frame)
+ 
+    def setup_check_button(self, frame):
+        """Set up the Check Port-Security button."""
+        self.check_port_security_button = ttk.Button(frame, text="Check Port-Security", command=self.check_port_security)
+        self.check_port_security_button.grid(row=7, column=1, pady=10)
+
+    def check_port_security(self):
+        self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
+        port_number = self.port_number_entry.get().strip()
+        if not port_number:
+            messagebox.showerror("Port Security", "Please specify the port number in the Port Security tab.")
+            return
+
+        verification_steps = [
+            f"show interfaces {port_number} status",
+            f"show interfaces {port_number}",
+            f"show port-security interface {port_number}",
+            f"show mac address-table interface {port_number}",
+            f"show running-config interface {port_number}"
+        ]
+
+        outputs = []  # Lista para almacenar las salidas
+
+        if self.is_connected():
+            for cmd in verification_steps:
+                output = self.connection.send_command(cmd)
+                self.output_text.insert(tk.END, "\n" + cmd + "\n" + output)
+                self.output_text.see(tk.END)
+                outputs.append(output)
+        else:
+            self.connection_status.configure(text="Status: Not connected")
+            messagebox.showerror("Not Connected", "Please connect to a switch first!")
+        
+        self.generate_summary(outputs)
+
+    def generate_summary(self, outputs):
+        # Desglosar los outputs
+        status_output, interface_output, port_security_output, mac_table_output, running_config_output = outputs
+
+        # 1. Estado del puerto
+        port_status = "Connected" if "connected" in status_output else "Not Connected"
+
+        # Determinar speed y duplex
+        speed_duplex = next((line for line in status_output.splitlines() if "a-full" in line or "a-half" in line), None)
+        if speed_duplex:
+            parts = speed_duplex.split()
+            if len(parts) == 4:
+                _, duplex, speed, _ = parts
+            else:
+                duplex, speed = "Unknown", "Unknown"
+        else:
+            duplex, speed = "Unknown", "Unknown"
+
+        # 2. Port-Security
+        port_security_status = "Enabled" if "Port Security : Enabled" in port_security_output else "Disabled"
+        violation_mode = next((line.split(":")[1].strip() for line in port_security_output.splitlines() if "Violation Mode" in line), "Unknown")
+        max_mac_addresses = next((line.split(":")[1].strip() for line in port_security_output.splitlines() if "Maximum MAC Addresses" in line), "Unknown")
+
+        # 3. MAC Address
+        mac_addresses = [line.split()[1] for line in mac_table_output.splitlines() if "DYNAMIC" in line or "STATIC" in line]
+        
+        if len(mac_addresses) > 10:
+            mac_address_str = "\n".join(mac_addresses[:10]) + "\n... y más"
+        else:
+            mac_address_str = "\n".join(mac_addresses)
+
+        # 4. Configuración actual del puerto
+        running_config = "\n".join(running_config_output.splitlines()[3:])
+
+        # Compilar resumen
+        summary = f"""
+        --- Estado del Puerto ---
+        Estado: {port_status}
+        Velocidad: {speed}
+        Duplex: {duplex}
+
+        --- Configuración de Seguridad del Puerto ---
+        Estado: {port_security_status}
+        Modo de Violación: {violation_mode}
+        Máximo de Direcciones MAC: {max_mac_addresses}
+
+        --- Direcciones MAC Actuales ---
+        {mac_address_str}
+
+        --- Configuración Actual del Puerto ---
+        {running_config}
+        """
+
+        # Mostrar resumen en un cuadro de mensaje
+        messagebox.showinfo("Resumen del Puerto", summary)
+
+    def setup_port_security_frame(self):
+       # Variables
+        self.port_security_var = tk.BooleanVar()
+
+        # Create and place the widgets inside the port-security frame
+        ttk.Label(self.port_security_frame, text="Port Security Configuration", font=("Arial", 16)).grid(row=0, column=0, columnspan=5, pady=(10, 20))
+
+        self.port_security_check = ttk.Checkbutton(self.port_security_frame, text="Enable Port Security", variable=self.port_security_var)
+        self.port_security_check.grid(row=1, column=0, padx=20, pady=10, sticky=tk.W)
+        
+        self.port_security_max_label = ttk.Label(self.port_security_frame, text="Max MAC Addresses:")
+        self.port_security_max_label.grid(row=2, column=0, padx=20, pady=10, sticky=tk.W)
+
+        self.port_security_max_spinbox = ttk.Spinbox(self.port_security_frame, from_=1, to=10, width=5)
+        self.port_security_max_spinbox.grid(row=2, column=1, padx=20, pady=10, sticky=tk.W)
+        self.port_security_max_spinbox.set(1)
+
+        self.port_number_label = ttk.Label(self.port_security_frame, text="Port Number (e.g. Fa0/1):")
+        self.port_number_label.grid(row=3, column=0, padx=20, pady=10, sticky=tk.W)
+
+        self.port_number_entry = ttk.Entry(self.port_security_frame)
+        self.port_number_entry.grid(row=3, column=1, padx=20, pady=10, sticky=tk.W)
+
+        self.generate_port_security_activation_button = ttk.Button(self.port_security_frame, text="Activate Port-Security", command=self.generate_port_security_activation_config)  # Added command
+        self.generate_port_security_activation_button.grid(row=4, column=0, columnspan=2, padx=20, pady=10)
+
+        self.generate_port_security_deactivation_button = ttk.Button(self.port_security_frame, text="Deactivate Port-Security", command=self.generate_port_security_deactivation_config)  # Added command
+        self.generate_port_security_deactivation_button.grid(row=5, column=0, columnspan=2, padx=20, pady=10)
+
+        # Text widget to display the generated config
+        self.config_text = scrolledtext.ScrolledText(self.port_security_frame, wrap=tk.WORD, width=70, height=15)
+        self.config_text.grid(row=6, column=0, columnspan=5, padx=20, pady=20)
+
+    def generate_port_security_activation_config(self):
+        """Generate the port security activation config based on user input."""
+        if not self.port_security_var.get():
+            messagebox.showinfo("Port Security", "Port security is not enabled.")
+            return
+
+        port_number = self.port_number_entry.get().strip()
+        if not port_number:
+            messagebox.showerror("Port Security", "Please specify the port number.")
+            return
+
+        max_mac = self.port_security_max_spinbox.get()
+
+        config_commands_activate = [
+            "conf t",
+            f"interface {port_number}",
+            "switchport port-security",
+            f"switchport port-security maximum {max_mac}",
+            "switchport port-security mac-address sticky",
+            "no shutdown",
+            "end",
+            "wr"
+        ]
+
+        verification_steps_activate = [
+            f"1. show interfaces {port_number} status",
+            f"2. show interfaces {port_number}",
+            f"3. show port-security interface {port_number}",
+            f"4. show mac address-table interface {port_number}",
+            f"5. show running-config interface {port_number}"
+        ]
+
+        self.config_text.delete(1.0, tk.END)  # Clear the text widget before inserting new values
+        self.config_text.insert(tk.END, "Port-Security Activation for:\n\n")
+        for cmd in config_commands_activate:
+            self.config_text.insert(tk.END, cmd + "\n")
+        
+        self.config_text.insert(tk.END, "\nVerification Steps:\n")
+        for step in verification_steps_activate:
+            self.config_text.insert(tk.END, step + "\n")
+
+    def generate_port_security_deactivation_config(self):
+        """Generate the port security deactivation config based on user input."""
+        if not self.port_security_var.get():
+            messagebox.showinfo("Port Security", "Port security is not enabled.")
+            return
+
+        port_number = self.port_number_entry.get().strip()
+        if not port_number:
+            messagebox.showerror("Port Security", "Please specify the port number.")
+            return
+
+        config_commands_deactivate = [
+            "conf t",
+            f"interface {port_number}",
+            "no switchport port-security",
+            "no switchport port-security mac-address sticky",
+            "no shutdown",
+            "end",
+            "wr"
+        ]
+
+        verification_steps_deactivate = [
+            f"1. show interfaces {port_number} status",
+            f"2. show interfaces {port_number}",
+            f"3. show port-security interface {port_number}",
+            f"4. show mac address-table interface {port_number}",
+            f"5. show running-config interface {port_number}",
+            f"6. clear mac address-table dynamic interface {port_number}"
+        ]
+
+        self.config_text.delete(1.0, tk.END)  # Clear the text widget before inserting new values
+        self.config_text.insert(tk.END, "Generated Port Security Deactivation Config:\n\n")
+        for cmd in config_commands_deactivate:
+            self.config_text.insert(tk.END, cmd + "\n")
+        
+        self.config_text.insert(tk.END, "\nVerification Steps:\n")
+        for step in verification_steps_deactivate:
+            self.config_text.insert(tk.END, step + "\n")
+
+    def is_connected(self):
+        """Checks if still connected to the switch."""
+        if not self.connection:
+            return False
+        try:
+            self.connection.find_prompt()
+            return True
+        except:
+            return False
+
+    def send_command(self):
+        self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
+        commands = self.command_text.get("1.0", tk.END).strip().splitlines()
+        if self.is_connected():
+            try:
+                if "config t" in commands:
+                    # Use send_config_set for configuration commands
+                    output = self.connection.send_config_set(commands)
+                else:
+                    # Use send_command for regular commands
+                    output = "\n".join([self.connection.send_command(cmd) for cmd in commands])
+                    
+                self.output_text.insert(tk.END, "\n" + "\n".join(commands) + "\n" + output)
+                self.output_text.see(tk.END)
+            except Exception as e:
+                self.output_text.insert(tk.END, "\nError: " + str(e))
+                self.output_text.see(tk.END)
+                self.connection_status.configure(text="Status: Not connected")  # Agrega esta línea
+        else:
+            self.connection_status.configure(text="Status: Not connected")
+            messagebox.showerror("Not Connected", "Please connect to a switch first!")
+
+    def enter_config_mode(self):
+            """
+            Handles the switch configuration mode.
+            """
+            config_mode = self.connection.config_mode()
+            if self.connection.check_config_mode():
+                return f"Entered into config mode.\n{config_mode}"
+            else:
+                return "Failed to enter config mode."
+
+    def setup_labels(self, frame):
+        ttk.Label(frame, text="Switch Configuration", font=("Arial", 16)).grid(row=0, column=0, columnspan=3, pady=(10, 20))
+        ttk.Label(frame, text="Switch:").grid(row=1, column=0, padx=20, pady=5, sticky=tk.W)
+        ttk.Label(frame, text="IP Address:").grid(row=2, column=0, padx=20, pady=5, sticky=tk.W)
+        ttk.Label(frame, text="Username:").grid(row=3, column=0, padx=20, pady=5, sticky=tk.W)
+        ttk.Label(frame, text="Password:").grid(row=4, column=0, padx=20, pady=5, sticky=tk.W)
+        ttk.Label(frame, text="Switch Name (Nemónico):").grid(row=5, column=0, padx=20, pady=5, sticky=tk.W)
+        self.connection_status = ttk.Label(frame, text="Status: Not connected")
+        self.connection_status.grid(row=6, column=0, columnspan=3, pady=10)
+
+    def setup_entries(self, frame):
+        self.ip_entry = ttk.Entry(frame)
+        self.username_entry = ttk.Entry(frame)
+        self.password_entry = ttk.Entry(frame, show='*')
+        self.nemonico_entry = ttk.Entry(frame)
+
+        self.ip_entry.grid(row=2, column=1, padx=20, pady=5, sticky=tk.W)
+        self.username_entry.grid(row=3, column=1, padx=20, pady=5, sticky=tk.W)
+        self.password_entry.grid(row=4, column=1, padx=20, pady=5, sticky=tk.W)
+        self.nemonico_entry.grid(row=5, column=1, padx=20, pady=5, sticky=tk.W)
+    
+    def send_multiple_commands(self, commands):
+        for command in commands:
+            output = self.connection.send_command(command)
+            self.output_text.insert(tk.END, "\n" + command + "\n" + output)
+            # Auto-scroll to the end
+            self.output_text.see(tk.END)
+
+    def setup_combobox(self, frame):
+        self.switch_combobox = ttk.Combobox(frame, values=[switch[1] + " - " + switch[0] for switch in self.switches], postcommand=self.update_combobox)
+        self.switch_combobox.grid(row=1, column=1, padx=20, pady=10, sticky=tk.W)
+        self.switch_combobox.bind("<<ComboboxSelected>>", self.load_switch_data)
+
+    def setup_buttons(self, frame):
+        
+        self.connect_button = ttk.Button(frame, text="Connect", command=self.connect_to_switch)  # Added command
+        self.send_command_button = ttk.Button(frame, text="Send Command", command=self.send_command)  # Added command
+        self.backup_button = ttk.Button(frame, text="Backup", command=self.backup_config)  # Added command
+        self.check_port_security_button = ttk.Button(frame, text="Check Port-Security", command=self.check_port_security)  # Added command
+
+        self.connect_button.grid(row=7, column=0, pady=10, sticky=tk.W)
+        self.send_command_button.grid(row=7, column=1, pady=10, sticky=tk.W)
+        self.backup_button.grid(row=7, column=2, pady=10, sticky=tk.E)
+        self.check_port_security_button.grid(row=8, column=0, columnspan=3, pady=10, sticky=tk.W+tk.E)
+       
+    def backup_config(self):
+            self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
+            if self.connection:
+                nemonico = self.nemonico_entry.get()
+                ip = self.ip_entry.get()
+                output = self.connection.send_command('show running-config')
+                folder_name = f"{nemonico}-{ip}"
+                if not os.path.exists(folder_name):
+                    os.makedirs(folder_name)
+                with open(os.path.join(folder_name, 'backup.txt'), 'w') as file:
+                    file.write(output)
+                messagebox.showinfo("Backup", f"Backup saved in {folder_name}/backup.txt")
+            else:
+                messagebox.showerror("Not Connected", "Please connect to a switch first!")         
+
+    def setup_output_text(self, frame):
+        self.command_text = tk.Text(frame, height=5, width=70)
+        self.command_text.grid(row=0, column=0, columnspan=3, padx=20, pady=10, sticky=tk.W+tk.E)
+        self.output_text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=70, height=20)
+        self.output_text.grid(row=2, column=0, columnspan=3, padx=20, pady=10, sticky=tk.W+tk.E)
+    
+    def update_combobox(self):
+        pass
+
+    def load_switch_data(self, event=None):
+        selected = self.switch_combobox.get()
+        if selected:
+            ip = selected.split(" - ")[1]
+            for switch in self.switches:
+                if switch[0] == ip:
+                    self.ip_entry.delete(0, tk.END)
+                    self.username_entry.delete(0, tk.END)
+                    self.password_entry.delete(0, tk.END)
+                    self.nemonico_entry.delete(0, tk.END)
+
+                    self.ip_entry.insert(0, switch[0])
+                    self.username_entry.insert(0, switch[2])
+                    self.password_entry.insert(0, switch[3])
+                    
+                    # Only overwrite the mnemonic if it's valid
+                    if switch[1]:
+                        self.nemonico_entry.insert(0, switch[1])
+
+    def update_combobox(self):
+        self.switches = self.get_all_switches()
+        self.switch_combobox["values"] = [switch[1] + " - " + switch[0] for switch in self.switches]
+
+    def connect_to_switch(self):
+        self.output_text.delete(1.0, tk.END)  # Agrega esta línea para limpiar el área de texto
+        ip = self.ip_entry.get()
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+
+        device = {
+            'device_type': 'cisco_ios',
+            'ip': ip,
+            'username': username,
+            'password': password,
+        }
+        try:
+            self.connection = ConnectHandler(**device)
+            welcome_msg = self.connection.find_prompt()
+            self.output_text.insert(tk.END, welcome_msg)
+            self.connection_status.configure(text="Status: Connected")
+
+            # Extracting nemonico from the welcome message
+            nemonico = welcome_msg.split("#")[0]
+            self.nemonico_entry.delete(0, tk.END)
+            self.nemonico_entry.insert(0, nemonico)
+
+            # If connection is successful and IP is not a duplicate, save to database
+            if not self.check_duplicate(ip):
+                self.add_to_db(ip, nemonico, username, password)
+
+        except (NetMikoTimeoutException, NetMikoAuthenticationException) as e:
+            self.connection = None
+            messagebox.showerror("Error", str(e))
+            self.connection_status.configure(text="Status: Not connected")
+   
+    def init_db(self):
+        conn = sqlite3.connect('switch_data.db')
+        cursor = conn.cursor()
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS switch_data (
+            id INTEGER PRIMARY KEY,
+            ip TEXT NOT NULL,
+            nemonic TEXT,
+            username TEXT NOT NULL,
+            password TEXT NOT NULL
+        )
+        """)
+        conn.commit()
+        conn.close()
+
+    def add_to_db(self, ip, nemonico, username, password):
+        conn = sqlite3.connect('switch_data.db')
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO switch_data (ip, nemonic, username, password) VALUES (?, ?, ?, ?)", (ip, nemonico, username, password))
+        conn.commit()
+        conn.close()
+
+    def get_all_switches(self):
+        conn = sqlite3.connect('switch_data.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT ip, nemonic, username, password FROM switch_data")
+        switches = cursor.fetchall()
+        conn.close()
+        return switches
+
+    def check_duplicate(self, ip):
+        conn = sqlite3.connect('switch_data.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM switch_data WHERE ip=?", (ip,))
+        data = cursor.fetchone()
+        conn.close()
+        return data is not None
+
+    def lookup_mac(self):
+        mac_address = self.mac_entry.get().strip()
+        try:
+            response = requests.get(f"https://api.macvendors.com/{mac_address}")
+            if response.status_code == 200 and response.text:
+                manufacturer = response.text
+                messagebox.showinfo("MAC Lookup", f"MAC Address {mac_address} pertenece a: {manufacturer}")
+            else:
+                messagebox.showwarning("MAC Lookup", "Dirección MAC desconocida o inválida. Intente nuevamente.")
+        except:
+            messagebox.showerror("MAC Lookup", "Error al buscar el fabricante. Verifique su conexión a internet y vuelva a intentarlo.")
+
+    def setup_mac_lookup(self, frame):
+        self.mac_frame = ttk.LabelFrame(frame, text="MAC Lookup", padding=(20, 15))  # Define mac_frame here
+        self.mac_frame.grid(row=0, column=1, padx=20, pady=10, sticky=tk.W+tk.E)  # Move to the right
+        
+        self.mac_label = ttk.Label(self.mac_frame, text="MAC Address Lookup:", font=("Arial", 12))
+        self.mac_entry = ttk.Entry(self.mac_frame)
+        self.mac_button = ttk.Button(self.mac_frame, text="Lookup MAC", command=self.lookup_mac)
+
+        self.mac_label.grid(row=0, column=0, padx=20, pady=10, sticky=tk.W)
+        self.mac_entry.grid(row=0, column=1, padx=20, pady=10, sticky=tk.W)
+        self.mac_button.grid(row=0, column=2, padx=20, pady=10)   
+ 
+    def setup_voice_data_tab(self, frame):
+        # Título e Instrucciones
+        title_label = ttk.Label(frame, text="Configuración Voz y Datos", font=("Arial", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=2, pady=10, sticky=tk.W)
+
+        # Puerto
+        port_label = ttk.Label(frame, text="Número de Puerto (Ej: Gi1/0/39):", font=("Arial", 12))
+        port_label.grid(row=1, column=0, padx=20, pady=10, sticky=tk.W)
+        self.port_entry = ttk.Entry(frame)
+        self.port_entry.grid(row=1, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+
+        # Descripción
+        desc_label = ttk.Label(frame, text="Descripción:", font=("Arial", 12))
+        desc_label.grid(row=2, column=0, padx=20, pady=10, sticky=tk.W)
+        self.desc_entry = ttk.Entry(frame)
+        self.desc_entry.grid(row=2, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+
+        # VLAN
+        vlan_label = ttk.Label(frame, text="Número de VLAN:", font=("Arial", 12))
+        vlan_label.grid(row=3, column=0, padx=20, pady=10, sticky=tk.W)
+        self.vlan_entry = ttk.Entry(frame)
+        self.vlan_entry.grid(row=3, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+
+        # IP Device Tracking
+        ip_device_label = ttk.Label(frame, text="Valor IP Device Tracking:", font=("Arial", 12))
+        ip_device_label.grid(row=4, column=0, padx=20, pady=10, sticky=tk.W)
+        self.ip_device_entry = ttk.Entry(frame)
+        self.ip_device_entry.grid(row=4, column=1, padx=20, pady=10, sticky=tk.W+tk.E)
+
+        # Botón para Generar
+        generate_button = ttk.Button(frame, text="Generar Código", command=self.generate_voice_data_config)
+        generate_button.grid(row=5, column=0, columnspan=2, pady=20)
+
+        # Cuadro de Texto para el Código
+        self.code_output = tk.Text(frame, height=20, width=80)
+        self.code_output.grid(row=6, column=0, columnspan=2, padx=20, pady=10)
+    
+    def generate_voice_data_config(self):
+        port = self.port_entry.get().strip()
+        desc = self.desc_entry.get().strip()
+        vlan = self.vlan_entry.get().strip()
+        ip_device = self.ip_device_entry.get().strip()
+
+        config = f"""
+conf t
+interface {port}
+description {desc}
+switchport access vlan {vlan}
+switchport mode access
+ip device tracking maximum {ip_device}
+spanning-tree portfast
+no shutdown
+end
+"""
+
+        # Estos son los comandos de validación
+        validation_steps = [
+            f"\n\n-- Pasos de Validación --",
+            f"1. show interfaces {port} status",
+            f"2. show interfaces {port}",
+            f"3. show ip device tracking interface {port}",
+            f"4. show running-config interface {port}"
+        ]
+
+        # Mostrar el código de configuración y los comandos de validación en el cuadro de texto
+        self.code_output.delete(1.0, tk.END)
+        self.code_output.insert(tk.END, config + "\n".join(validation_steps))
+
+if __name__ == '__main__':
+    app = SwitchConfigApp()
+    app.mainloop()
