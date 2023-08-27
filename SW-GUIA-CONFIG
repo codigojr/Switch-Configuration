@@ -21,20 +21,16 @@ class SwitchConfigApp(tk.Tk):
 
         # Set window properties
         self.title("Switch Configuration GUI Enhanced by Jose Roberto Medina")
-        self.geometry("1495x651")
+        self.geometry("1540x651")
 
         # Create a notebook (tabs)
         self.notebook = ttk.Notebook(self)
         self.notebook.grid(row=0, column=0, sticky=tk.N+tk.E+tk.S+tk.W, padx=10, pady=10)
 
-
         # Asegúrate de que la ventana principal se expanda para acomodar el notebook
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         
-
-
-
         # Create frames for each tab
         self.general_frame = ttk.Frame(self.notebook)
         self.port_security_frame = ttk.Frame(self.notebook)
@@ -159,6 +155,9 @@ Saludos"""
         self.check_port_security_button = ttk.Button(frame, text="Check Port-Security", command=self.check_port_security)
         self.check_port_security_button.grid(row=7, column=1, pady=10)
 
+    def show_ip_device_tracking(self):
+        messagebox.showinfo("Información", "Pronto estará disponible!")
+    
     def check_port_security(self):
         self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
         port_number = self.port_number_entry.get().strip()
@@ -428,20 +427,50 @@ Saludos"""
             self.output_text.see(tk.END)
 
     def setup_combobox(self, frame):
-        self.switch_combobox = ttk.Combobox(frame, values=[switch[1] + " - " + switch[0] for switch in self.switches], postcommand=self.update_combobox)
+        ttk.Label(frame, text="Switch IP:").grid(row=1, column=0, padx=20, pady=10, sticky=tk.W) 
+        self.switch_combobox = ttk.Combobox(frame, postcommand=self.update_combobox_from_db, width=30)
+
         self.switch_combobox.grid(row=1, column=1, padx=20, pady=10, sticky=tk.W)
-        self.switch_combobox.bind("<<ComboboxSelected>>", self.load_switch_data)
+        self.switch_combobox.bind("<<ComboboxSelected>>", self.load_switch_data_from_db)
+        self.switch_combobox.bind('<KeyRelease>', self.update_combobox_from_db)
 
+    # Mantenemos la versión que usa SQLite y renombramos la función
+    def load_switch_data_from_db(self, event):
+        conn = sqlite3.connect('switch_data.db')
+        cursor = conn.cursor()
+        ip_selected = self.switch_combobox.get()
+        cursor.execute("SELECT username, password FROM switch_data WHERE ip=?", (ip_selected,))
+        data = cursor.fetchone()
+        if data:
+            username, password = data
+            self.username_entry.delete(0, tk.END)
+            self.username_entry.insert(0, username)
+            self.password_entry.delete(0, tk.END)
+            self.password_entry.insert(0, password)
+        conn.close()
+
+    # Mantenemos la versión que usa SQLite y renombramos la función
+    def update_combobox_from_db(self, event=None):
+        query = self.switch_combobox.get()
+        ips = self.filter_switches(query)
+        self.switch_combobox['values'] = ips 
+   
     def setup_buttons(self, frame):
-        
-        self.connect_button = ttk.Button(frame, text="Connect", command=self.connect_to_switch)
+        # Botón para realizar un respaldo del switch
         self.backup_button = ttk.Button(frame, text="Backup", command=self.backup_config)
+        self.backup_button.grid(row=0, column=0, pady=10, sticky=tk.W)  # En la posición superior izquierda
+
+        # Botón para conectarse al switch
+        self.connect_button = ttk.Button(frame, text="Connect", command=self.connect_to_switch)
+        self.connect_button.grid(row=0, column=2, pady=10, sticky=tk.W)  # Debajo del botón de Backup
+
+        # Botón para verificar Port-Security
         self.check_port_security_button = ttk.Button(frame, text="Check Port-Security", command=self.check_port_security)
+        self.check_port_security_button.grid(row=6, column=0, pady=10, sticky=tk.W)  # A la derecha del botón Connect
 
-        self.connect_button.grid(row=7, column=0, pady=10, sticky=tk.W)
-        self.backup_button.grid(row=7, column=2, pady=10, sticky=tk.E)
-        self.check_port_security_button.grid(row=8, column=0, columnspan=3, pady=10, sticky=tk.W+tk.E)
-
+        # Botón para mostrar IP Device Tracking (aún sin funcionalidad completa)
+        self.show_ip_device_tracking_button = ttk.Button(frame, text="Check Device Tracking", command=self.show_ip_device_tracking)
+        self.show_ip_device_tracking_button.grid(row=7, column=0, pady=10, sticky=tk.W)  # A la derecha del botón de Port-Security
        
     def backup_config(self):
             self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
@@ -459,13 +488,14 @@ Saludos"""
                 messagebox.showerror("Not Connected", "Please connect to a switch first!")         
 
     def setup_output_text(self, frame):
-        self.command_text = tk.Text(frame, height=5, width=70)
+        
+        self.command_text = tk.Text(frame, height=5, width=70, padx=10, pady=10)
         self.command_text.grid(row=0, column=0, padx=20, pady=10, sticky=tk.W)
         
         self.send_command_button = ttk.Button(frame, text="Send Command", command=self.send_command)
         self.send_command_button.grid(row=0, column=1, padx=20, pady=10, sticky=tk.W)  # Moved to command_frame next to command_text
 
-        self.output_text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=70, height=20)
+        self.output_text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=70, height=24)  # tamacho de lisbox para interatuar en el sw
         self.output_text.grid(row=2, column=0, columnspan=3, padx=20, pady=10, sticky=tk.W+tk.E)
     
     def update_combobox(self):
@@ -490,9 +520,28 @@ Saludos"""
                     if switch[1]:
                         self.nemonico_entry.insert(0, switch[1])
 
+    def load_switch_data(self, event):
+        conn = sqlite3.connect('switch_data.db')
+        cursor = conn.cursor()
+        ip_selected = self.switch_combobox.get()
+        cursor.execute("SELECT username, password FROM switch_data WHERE ip=?", (ip_selected,))
+        data = cursor.fetchone()
+        if data:
+            username, password = data
+            self.username_entry.delete(0, tk.END)
+            self.username_entry.insert(0, username)
+            self.password_entry.delete(0, tk.END)
+            self.password_entry.insert(0, password)
+        conn.close()                   
+
     def update_combobox(self):
         self.switches = self.get_all_switches()
         self.switch_combobox["values"] = [switch[1] + " - " + switch[0] for switch in self.switches]
+
+    def update_combobox(self, event=None):
+        query = self.switch_combobox.get()
+        ips = self.filter_switches(query)
+        self.switch_combobox['values'] = ips    
 
     def connect_to_switch(self):
         self.output_text.delete(1.0, tk.END)  # Agrega esta línea para limpiar el área de texto
@@ -658,6 +707,23 @@ end
         # Mostrar el código de configuración y los comandos de validación en el cuadro de texto
         self.code_output.delete(1.0, tk.END)
         self.code_output.insert(tk.END, config + "\n".join(validation_steps))
+
+    def setup_details(self, frame):
+            ttk.Label(frame, text="Username:").grid(row=1, column=0, padx=20, pady=10, sticky=tk.W)
+            self.username_entry = ttk.Entry(frame)
+            self.username_entry.grid(row=1, column=1, padx=20, pady=10, sticky=tk.W)
+
+            ttk.Label(frame, text="Password:").grid(row=2, column=0, padx=20, pady=10, sticky=tk.W)
+            self.password_entry = ttk.Entry(frame, show="*")
+            self.password_entry.grid(row=2, column=1, padx=20, pady=10, sticky=tk.W)
+    
+    def filter_switches(self, query):
+            conn = sqlite3.connect('switch_data.db')
+            cursor = conn.cursor()
+            cursor.execute("SELECT ip FROM switch_data WHERE ip LIKE ?", (f'%{query}%',))
+            ips = [item[0] for item in cursor.fetchall()]
+            conn.close()
+            return ips
 
 if __name__ == '__main__':
     app = SwitchConfigApp()
