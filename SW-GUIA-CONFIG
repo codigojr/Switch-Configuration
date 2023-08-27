@@ -369,6 +369,15 @@ Saludos"""
     def send_command(self):
         self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
         commands = self.command_text.get("1.0", tk.END).strip().splitlines()
+
+        # Comprobar si el atributo 'connection' existe.
+        if not hasattr(self, 'connection') or not self.connection:
+            self.output_text.insert(tk.END, "\nError: No connection available.")
+            self.output_text.see(tk.END)
+            self.connection_status.configure(text="Status: Not connected")
+            messagebox.showerror("Not Connected", "Please connect to a switch first!")
+            return  # Sal del método aquí.
+
         if self.is_connected():
             try:
                 if "config t" in commands:
@@ -387,6 +396,7 @@ Saludos"""
         else:
             self.connection_status.configure(text="Status: Not connected")
             messagebox.showerror("Not Connected", "Please connect to a switch first!")
+
 
     def enter_config_mode(self):
             """
@@ -473,19 +483,21 @@ Saludos"""
         self.show_ip_device_tracking_button.grid(row=7, column=0, pady=10, sticky=tk.W)  # A la derecha del botón de Port-Security
        
     def backup_config(self):
-            self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
-            if self.connection:
-                nemonico = self.nemonico_entry.get()
-                ip = self.ip_entry.get()
-                output = self.connection.send_command('show running-config')
-                folder_name = f"{nemonico}-{ip}"
-                if not os.path.exists(folder_name):
-                    os.makedirs(folder_name)
-                with open(os.path.join(folder_name, 'backup.txt'), 'w') as file:
-                    file.write(output)
-                messagebox.showinfo("Backup", f"Backup saved in {folder_name}/backup.txt")
-            else:
-                messagebox.showerror("Not Connected", "Please connect to a switch first!")         
+        self.output_text.delete(1.0, tk.END)  # Limpia el área de texto
+        # Verifica si la conexión está establecida
+        if hasattr(self, 'connection') and self.connection:
+            nemonico = self.nemonico_entry.get()
+            ip = self.ip_entry.get()
+            output = self.connection.send_command('show running-config')
+            folder_name = f"{nemonico}-{ip}"
+            if not os.path.exists(folder_name):
+                os.makedirs(folder_name)
+            with open(os.path.join(folder_name, 'backup.txt'), 'w') as file:
+                file.write(output)
+            messagebox.showinfo("Backup", f"Backup saved in {folder_name}/backup.txt")
+        else:
+            messagebox.showerror("Not Connected", "¡Por favor, conéctate a un switch primero!")
+    
 
     def setup_output_text(self, frame):
         
@@ -545,9 +557,14 @@ Saludos"""
 
     def connect_to_switch(self):
         self.output_text.delete(1.0, tk.END)  # Agrega esta línea para limpiar el área de texto
-        ip = self.ip_entry.get()
-        username = self.username_entry.get()
-        password = self.password_entry.get()
+        ip = self.ip_entry.get().strip()
+        username = self.username_entry.get().strip()
+        password = self.password_entry.get().strip()
+
+        # Verifica si los campos requeridos están vacíos
+        if not ip or not username or not password:
+            messagebox.showerror("Campos vacíos", "Por favor, rellena todos los campos requeridos.")
+            return
 
         device = {
             'device_type': 'cisco_ios',
@@ -574,6 +591,7 @@ Saludos"""
             self.connection = None
             messagebox.showerror("Error", str(e))
             self.connection_status.configure(text="Status: Not connected")
+
    
     def init_db(self):
         conn = sqlite3.connect('switch_data.db')
